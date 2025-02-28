@@ -179,32 +179,6 @@ stream.start
 
 For detailed documentation on streaming, including event handling and best practices, see [docs/streaming.md](docs/streaming.md).
 
-## Testing
-
-AnthropicTools includes support for testing with VCR:
-
-```ruby
-# In your spec_helper.rb or rails_helper.rb
-require 'vcr'
-
-VCR.configure do |config|
-  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
-  config.hook_into :webmock
-  config.filter_sensitive_data('<ANTHROPIC_API_KEY>') { ENV['ANTHROPIC_API_KEY'] }
-end
-
-# In your tests
-RSpec.describe "My Feature", :vcr do
-  it "works with Claude" do
-    client = AnthropicTools.client
-    response = client.chat({ role: 'user', content: 'Hello' })
-    expect(response[:content]).to include("Hello")
-  end
-end
-```
-
-For detailed documentation on testing, including VCR setup and best practices, see [docs/testing.md](docs/testing.md).
-
 ## Additional Features
 
 ### Token Counting
@@ -216,6 +190,8 @@ puts "Input tokens: #{token_count[:input_tokens]}"
 
 ### Error Handling
 
+AnthropicTools provides detailed error classes for different types of API errors:
+
 ```ruby
 begin
   response = client.chat({ role: 'user', content: 'Hello' })
@@ -223,10 +199,60 @@ rescue AnthropicTools::BadRequestError => e
   puts "Bad Request Error: #{e.message}"
   puts "Status code: #{e.status_code}"
   puts "Request ID: #{e.request_id}"
+rescue AnthropicTools::RateLimitError => e
+  puts "Rate limit exceeded. Retry after: #{e.headers['retry-after']}"
+rescue AnthropicTools::AuthenticationError => e
+  puts "Authentication error: Check your API key"
+rescue AnthropicTools::PermissionDeniedError => e
+  puts "Permission denied: #{e.message}"
+rescue AnthropicTools::ServerError => e
+  puts "Server error: #{e.message}"
 rescue AnthropicTools::ApiError => e
   puts "API Error: #{e.message}"
 end
 ```
+
+### Retry Logic
+
+AnthropicTools includes built-in retry logic for handling transient API errors. By default, it will retry on status codes 408, 429, 500, 502, 503, and 504 with exponential backoff.
+
+```ruby
+AnthropicTools.configure do |config|
+  # Customize retry behavior
+  config.max_retries = 5                                # Maximum retry attempts
+  config.retry_initial_delay = 0.5                      # Initial delay in seconds
+  config.retry_max_delay = 10.0                         # Maximum delay between retries
+  config.retry_jitter = 0.25                            # Random jitter factor
+  config.retry_statuses = [429, 500, 502, 503, 504]     # Status codes to retry
+end
+```
+
+The retry mechanism uses exponential backoff with jitter to avoid overwhelming the API during outages.
+
+### Dynamic Timeouts
+
+AnthropicTools automatically calculates appropriate timeouts for large requests based on the `max_tokens` parameter:
+
+```ruby
+AnthropicTools.configure do |config|
+  # Base timeout for regular requests
+  config.timeout = 120 # 2 minutes
+  
+  # For requests with large max_tokens, a dynamic timeout is calculated
+  # The formula is approximately: 60 minutes * tokens / 128,000
+  # This ensures long-running generations don't time out prematurely
+end
+
+# The client will automatically use the dynamic timeout for requests with large max_tokens
+response = client.chat(
+  { role: 'user', content: 'Write a detailed essay.' },
+  max_tokens: 8000 # Will get a longer timeout automatically
+)
+```
+
+## Testing
+
+AnthropicTools includes support for testing with VCR. For detailed documentation on testing, including VCR setup and best practices, see [docs/testing.md](docs/testing.md).
 
 ## Terminology
 
