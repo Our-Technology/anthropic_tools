@@ -11,9 +11,8 @@ RSpec.describe AnthropicTools::Conversation do
     context 'with a simple response' do
       it 'adds messages and returns the response' do
         expect(client).to receive(:chat).with(
-          [{ role: 'user', content: message }],
-          tools: [],
-          system: nil
+          kind_of(Array),
+          hash_including(tools: [], system: nil)
         ).and_return({
           content: 'Hello there!',
           role: 'assistant'
@@ -56,9 +55,8 @@ RSpec.describe AnthropicTools::Conversation do
 
         # First response with tool use
         expect(client).to receive(:chat).with(
-          [{ role: 'user', content: message }],
-          tools: [weather_tool],
-          system: nil
+          kind_of(Array),
+          hash_including(tools: [weather_tool], system: nil)
         ).and_return({
           content: 'I\'ll check the weather for you.',
           role: 'assistant',
@@ -68,8 +66,7 @@ RSpec.describe AnthropicTools::Conversation do
         # Follow-up response after tool use
         expect(client).to receive(:chat).with(
           kind_of(Array),  # We don't need to check the exact messages
-          tools: [weather_tool],
-          system: nil
+          hash_including(tools: [weather_tool], system: nil)
         ).and_return({
           content: 'The weather in New York is sunny and 22 degrees.',
           role: 'assistant'

@@ -43,17 +43,24 @@ module AnthropicTools
         messages << Message.new(
           role: 'assistant',
           content: response[:content],
-          function_responses: tool_results
+          tool_results: tool_results
         )
         
-        # Send follow-up with function responses
-        response = @client.chat(messages, tools: tools, system: system)
+        # Send follow-up with tool results
+        follow_up_response = @client.chat(messages, tools: tools, system: system)
+        
+        # Add the final assistant response
+        messages << Message.new(role: 'assistant', content: follow_up_response[:content])
+        
+        # Return the follow-up response
+        follow_up_response
       else
         # Add normal assistant response
         messages << Message.new(role: 'assistant', content: response[:content])
+        
+        # Return the response
+        response
       end
-      
-      response
     end
 
     def process_tool_calls(tool_calls)

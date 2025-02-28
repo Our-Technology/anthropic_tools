@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'webmock/rspec'
 
 RSpec.describe AnthropicTools::Client do
   let(:config) do
@@ -77,7 +78,8 @@ RSpec.describe AnthropicTools::Client do
         
         result = client.chat(message, tools: [weather_tool])
         
-        expect(result[:tool_calls]).to be_present
+        expect(result[:tool_calls]).not_to be_nil
+        expect(result[:tool_calls]).not_to be_empty
         expect(result[:tool_calls].first).to be_a(AnthropicTools::ToolUse)
         expect(result[:tool_calls].first.name).to eq('get_weather')
         expect(result[:tool_calls].first.input).to eq({ 'location' => 'New York' })
@@ -95,6 +97,33 @@ RSpec.describe AnthropicTools::Client do
         stub_anthropic_api({ 'error' => { 'message' => 'Rate limit exceeded' } }, status: 429)
         
         expect { client.chat(message) }.to raise_error(AnthropicTools::RateLimitError)
+      end
+    end
+
+    context 'with streaming' do
+      it 'sets the stream parameter to true' do
+        # Create a test double for the connection
+        connection = instance_double(Faraday::Connection)
+        allow(client).to receive(:connection).and_return(connection)
+        
+        # Set up expectations
+        expect(connection).to receive(:post).with('/v1/messages') do |&block|
+          req = double('request')
+          options = double('options')
+          allow(req).to receive(:options).and_return(options)
+          allow(options).to receive(:on_data=)
+          
+          expect(req).to receive(:body=) do |body_json|
+            body = JSON.parse(body_json)
+            expect(body['stream']).to eq(true)
+          end
+          
+          block.call(req)
+          double('response', status: 200, body: '')
+        end
+        
+        # Call the method
+        client.chat(message, stream: true) { |chunk| }
       end
     end
   end

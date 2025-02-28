@@ -46,6 +46,7 @@ class FileProcessor
     
     # Create a conversation with Claude
     conversation = AnthropicTools::Conversation.new(
+      AnthropicTools.client,
       system: "You are a helpful assistant that specializes in analyzing files and extracting structured information.",
       tools: tools
     )

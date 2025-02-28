@@ -7,7 +7,7 @@ A Ruby on Rails library to leverage Anthropic's Claude models with tool use capa
 Add this to your Gemfile:
 
 ```ruby
-gem 'anthropic_tools', git: 'https://github.com/yourusername/anthropic_tools.git'
+gem 'anthropic_tools', git: 'https://github.com/our-technology/anthropic_tools.git'
 ```
 
 Then run:
@@ -15,6 +15,11 @@ Then run:
 ```bash
 bundle install
 ```
+
+## Requirements
+
+- Ruby 3.2.2 or higher
+- Rails 6.0 or higher (for Rails integration)
 
 ## Setup
 
@@ -38,6 +43,26 @@ client = AnthropicTools.client
 message = { role: 'user', content: 'Hello Claude!' }
 response = client.chat(message)
 puts response[:content]
+```
+
+### Streaming Example
+
+```ruby
+# Initialize client
+client = AnthropicTools.client
+
+# Send a message with streaming enabled
+message = { role: 'user', content: 'Write a short poem.' }
+
+client.chat(message, stream: true) do |chunk|
+  case chunk['type']
+  when 'content_block_delta'
+    print chunk['delta']['text']
+    $stdout.flush  # Ensure text is displayed immediately
+  when 'message_delta'
+    puts "\n\nMessage complete." if chunk['delta']['stop_reason'] == 'end_turn'
+  end
+end
 ```
 
 ### Working with Tools
