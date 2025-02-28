@@ -45,11 +45,14 @@ RSpec.describe AnthropicTools::Client do
       let(:weather_tool) do
         AnthropicTools::Tool.new(
           name: 'get_weather',
-          description: 'Get weather information',
-          parameters: {
+          description: 'Get weather information for a specific location. This tool returns the current weather conditions including temperature and general conditions like sunny, cloudy, or rainy.',
+          input_schema: {
             type: 'object',
             properties: {
-              location: { type: 'string' }
+              location: { 
+                type: 'string',
+                description: 'The city and state, e.g. San Francisco, CA'
+              }
             },
             required: ['location']
           }
@@ -65,13 +68,12 @@ RSpec.describe AnthropicTools::Client do
             { 'type' => 'text', 'text' => 'I\'ll check the weather for you.' },
             { 
               'type' => 'tool_use',
-              'tool_use' => {
-                'id' => 'call_12345',
-                'name' => 'get_weather',
-                'input' => { 'location' => 'New York' }
-              }
+              'id' => 'call_12345',
+              'name' => 'get_weather',
+              'input' => { 'location' => 'New York' }
             }
-          ]
+          ],
+          'stop_reason' => 'tool_use'
         }
         
         stub_anthropic_api(response_body)
@@ -83,6 +85,36 @@ RSpec.describe AnthropicTools::Client do
         expect(result[:tool_calls].first).to be_a(AnthropicTools::ToolUse)
         expect(result[:tool_calls].first.name).to eq('get_weather')
         expect(result[:tool_calls].first.input).to eq({ 'location' => 'New York' })
+      end
+      
+      it 'supports tool_choice parameter' do
+        # Create a test double for the connection
+        connection = instance_double(Faraday::Connection)
+        response = instance_double(Faraday::Response, status: 200, body: {})
+        allow(client).to receive(:connection).and_return(connection)
+        
+        # Set up expectations
+        expect(connection).to receive(:post).with('/v1/messages', hash_including(
+          tool_choice: { type: 'any' }
+        )).and_return(response)
+        
+        # Call the method
+        client.chat(message, tools: [weather_tool], tool_choice: { type: 'any' })
+      end
+      
+      it 'supports disable_parallel_tool_use parameter' do
+        # Create a test double for the connection
+        connection = instance_double(Faraday::Connection)
+        response = instance_double(Faraday::Response, status: 200, body: {})
+        allow(client).to receive(:connection).and_return(connection)
+        
+        # Set up expectations
+        expect(connection).to receive(:post).with('/v1/messages', hash_including(
+          tool_choice: { type: 'auto', disable_parallel_tool_use: true }
+        )).and_return(response)
+        
+        # Call the method
+        client.chat(message, tools: [weather_tool], disable_parallel_tool_use: true)
       end
     end
 

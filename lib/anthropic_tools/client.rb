@@ -12,8 +12,10 @@ module AnthropicTools
     end
 
     # Send a message to Claude
-    def chat(messages, tools: [], system: nil, max_tokens: nil, temperature: nil, stream: false, &block)
-      payload = build_payload(messages, tools, system, max_tokens, temperature)
+    def chat(messages, tools: [], system: nil, max_tokens: nil, temperature: nil, stream: false, 
+             tool_choice: nil, disable_parallel_tool_use: nil, &block)
+      payload = build_payload(messages, tools, system, max_tokens, temperature, 
+                             tool_choice, disable_parallel_tool_use)
       
       if stream && block_given?
         stream_response(payload, &block)
@@ -51,24 +53,38 @@ module AnthropicTools
       }
     end
 
-    def build_payload(messages, tools, system, max_tokens, temperature)
+    def build_payload(messages, tools, system, max_tokens, temperature, tool_choice, disable_parallel_tool_use)
       payload = {
         model: config.model,
         max_tokens: max_tokens || config.max_tokens,
         temperature: temperature || config.temperature
       }
-      
+
       # Format messages array
-      payload[:messages] = messages.is_a?(Array) ? 
-        messages.map { |m| m.is_a?(Message) ? m.to_h : m } : 
+      payload[:messages] = messages.is_a?(Array) ?
+        messages.map { |m| m.is_a?(Message) ? m.to_h : m } :
         [messages.is_a?(Message) ? messages.to_h : messages]
-      
+
       # Add system prompt if provided
       payload[:system] = system if system
-      
+
       # Add tools if provided
       if tools && !tools.empty?
         payload[:tools] = tools.map { |t| t.is_a?(Tool) ? t.to_h : t }
+
+        # Add tool_choice if provided
+        if tool_choice
+          payload[:tool_choice] = tool_choice
+        end
+
+        # Add disable_parallel_tool_use if provided
+        if !disable_parallel_tool_use.nil?
+          if payload[:tool_choice].is_a?(Hash)
+            payload[:tool_choice][:disable_parallel_tool_use] = disable_parallel_tool_use
+          else
+            payload[:tool_choice] = { type: 'auto', disable_parallel_tool_use: disable_parallel_tool_use }
+          end
+        end
       end
 
       payload
@@ -81,17 +97,10 @@ module AnthropicTools
 
     def stream_response(payload, &block)
       payload[:stream] = true
-      
+
       response = connection.post('/v1/messages') do |req|
         req.body = payload.to_json
         req.options.on_data = Proc.new do |chunk, size, env|
-          process_stream_chunk(chunk, &block)
-        end
-      end
-
-      # For testing purposes, if the response body contains data chunks, process them directly
-      if response.body.is_a?(String) && response.body.include?('data: {')
-        response.body.split("\n\n").each do |chunk|
           process_stream_chunk(chunk, &block)
         end
       end
@@ -103,7 +112,7 @@ module AnthropicTools
       if chunk.start_with?("data: ")
         data = chunk.sub(/^data: /, '').strip
         return if data == "[DONE]"
-        
+
         begin
           parsed = JSON.parse(data)
           block.call(parsed)
@@ -135,24 +144,28 @@ module AnthropicTools
         id: body['id'],
         model: body['model'],
         role: body['role'] || 'assistant',
-        content: extract_content(body['content']),
         stop_reason: body['stop_reason'],
         usage: body['usage']
       }
-      
-      # Extract tool calls if present
-      if body['content']&.any? { |block| block['type'] == 'tool_use' }
-        response[:tool_calls] = body['content']
-          .select { |block| block['type'] == 'tool_use' }
-          .map { |block| ToolUse.new(block['tool_use']) }
+
+      # Extract content from content blocks
+      if body['content']
+        response[:content_blocks] = body['content']
+        response[:content] = extract_content(body['content'])
+
+        # Extract tool calls if present
+        tool_use_blocks = body['content'].select { |block| block['type'] == 'tool_use' }
+        if !tool_use_blocks.empty?
+          response[:tool_calls] = tool_use_blocks.map { |block| ToolUse.new(block) }
+        end
       end
-      
+
       response
     end
 
     def extract_content(content_blocks)
       return "" unless content_blocks
-      
+
       content_blocks
         .select { |block| block['type'] == 'text' }
         .map { |block| block['text'] }

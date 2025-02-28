@@ -24,7 +24,7 @@ module AnthropicTools
       self
     end
 
-    def send(content = nil, max_tokens: nil, temperature: nil)
+    def send(content = nil, max_tokens: nil, temperature: nil, tool_choice: nil, disable_parallel_tool_use: nil)
       add_user_message(content) if content
       
       response = @client.chat(
@@ -32,31 +32,51 @@ module AnthropicTools
         tools: tools, 
         system: system,
         max_tokens: max_tokens,
-        temperature: temperature
+        temperature: temperature,
+        tool_choice: tool_choice,
+        disable_parallel_tool_use: disable_parallel_tool_use
       )
       
-      if response[:tool_calls]
+      if response[:tool_calls] && !response[:tool_calls].empty?
         # Process tool calls
         tool_results = process_tool_calls(response[:tool_calls])
         
         # Add assistant response with tool calls
         messages << Message.new(
           role: 'assistant',
-          content: response[:content],
+          content: response[:content_blocks] || response[:content]
+        )
+        
+        # Add user message with tool results
+        messages << Message.new(
+          role: 'user',
+          content: [],
           tool_results: tool_results
         )
         
-        # Send follow-up with tool results
-        follow_up_response = @client.chat(messages, tools: tools, system: system)
+        # Send follow-up to get final response
+        follow_up_response = @client.chat(
+          messages, 
+          tools: tools, 
+          system: system,
+          max_tokens: max_tokens,
+          temperature: temperature
+        )
         
         # Add the final assistant response
-        messages << Message.new(role: 'assistant', content: follow_up_response[:content])
+        messages << Message.new(
+          role: 'assistant', 
+          content: follow_up_response[:content_blocks] || follow_up_response[:content]
+        )
         
         # Return the follow-up response
         follow_up_response
       else
         # Add normal assistant response
-        messages << Message.new(role: 'assistant', content: response[:content])
+        messages << Message.new(
+          role: 'assistant', 
+          content: response[:content_blocks] || response[:content]
+        )
         
         # Return the response
         response
@@ -77,13 +97,15 @@ module AnthropicTools
           rescue => e
             ToolResult.new(
               tool_use_id: tool_call.id,
-              content: { error: e.message }.to_json
+              content: e.message,
+              is_error: true
             )
           end
         else
           ToolResult.new(
             tool_use_id: tool_call.id,
-            content: { error: "Tool not implemented" }.to_json
+            content: "Tool not implemented",
+            is_error: true
           )
         end
       end
