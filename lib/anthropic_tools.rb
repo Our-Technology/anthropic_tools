@@ -10,6 +10,8 @@ require 'anthropic_tools/tool_result'
 require 'anthropic_tools/conversation'
 require 'anthropic_tools/errors'
 require 'anthropic_tools/file_helper'
+require 'anthropic_tools/stream_helper'
+require 'anthropic_tools/stream_controller'
 require 'anthropic_tools/railtie' if defined?(Rails)
 
 module AnthropicTools

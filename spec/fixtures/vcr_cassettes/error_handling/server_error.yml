@@ -1,0 +1,54 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","max_tokens":4096,"temperature":0.7,"messages":[{"role":"user","content":"Hello"}]}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - sk-ant-api03-server-error-key
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 401
+      message: Unauthorized
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:17:29 GMT
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '86'
+      Connection:
+      - keep-alive
+      X-Should-Retry:
+      - 'false'
+      Request-Id:
+      - req_01JYYSr8hyi8JYy31c7FdiT4
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193c8f90cdff098-DFW
+    body:
+      encoding: UTF-8
+      string: '{"type":"error","error":{"type":"authentication_error","message":"invalid
+        x-api-key"}}'
+  recorded_at: Fri, 28 Feb 2025 22:17:29 GMT
+recorded_with: VCR 6.3.1

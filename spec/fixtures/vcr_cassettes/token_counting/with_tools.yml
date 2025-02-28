@@ -1,0 +1,57 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages/count_tokens
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","messages":[{"role":"user","content":"Hello,
+        Claude!"}],"tools":[{"name":"get_weather","description":"Get detailed weather
+        information for a specific location, including current conditions, forecast,
+        and any weather alerts","input_schema":{"type":"object","properties":{"location":{"type":"string","description":"The
+        city and state, e.g. San Francisco, CA"}},"required":["location"]}}]}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - "<ANTHROPIC_API_KEY>"
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:06:39 GMT
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '20'
+      Connection:
+      - keep-alive
+      Request-Id:
+      - req_01Aut9PEEmyAN2pcqEa2CdAw
+      Anthropic-Organization-Id:
+      - 4f9ffac4-8fad-4b74-916f-c799c8b61a1f
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193b915fff16b2f-DFW
+    body:
+      encoding: UTF-8
+      string: '{"input_tokens":409}'
+  recorded_at: Fri, 28 Feb 2025 22:06:39 GMT
+recorded_with: VCR 6.3.1

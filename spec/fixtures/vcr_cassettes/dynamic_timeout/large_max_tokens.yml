@@ -1,0 +1,167 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","max_tokens":4000,"temperature":0.7,"messages":[{"role":"user","content":"Write
+        a haiku about Ruby programming"}]}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - "<ANTHROPIC_API_KEY>"
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:07:55 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Anthropic-Ratelimit-Requests-Limit:
+      - '4000'
+      Anthropic-Ratelimit-Requests-Remaining:
+      - '3999'
+      Anthropic-Ratelimit-Requests-Reset:
+      - '2025-02-28T22:07:54Z'
+      Anthropic-Ratelimit-Input-Tokens-Limit:
+      - '200000'
+      Anthropic-Ratelimit-Input-Tokens-Remaining:
+      - '200000'
+      Anthropic-Ratelimit-Input-Tokens-Reset:
+      - '2025-02-28T22:07:54Z'
+      Anthropic-Ratelimit-Output-Tokens-Limit:
+      - '80000'
+      Anthropic-Ratelimit-Output-Tokens-Remaining:
+      - '80000'
+      Anthropic-Ratelimit-Output-Tokens-Reset:
+      - '2025-02-28T22:07:55Z'
+      Anthropic-Ratelimit-Tokens-Limit:
+      - '280000'
+      Anthropic-Ratelimit-Tokens-Remaining:
+      - '280000'
+      Anthropic-Ratelimit-Tokens-Reset:
+      - '2025-02-28T22:07:54Z'
+      Request-Id:
+      - req_01E9azttGaCj7HiZ4mAcApLh
+      Anthropic-Organization-Id:
+      - 4f9ffac4-8fad-4b74-916f-c799c8b61a1f
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193baedfa1d6b37-DFW
+    body:
+      encoding: ASCII-8BIT
+      string: '{"id":"msg_015AgpVqqcuFKLG9rBxVzm58","type":"message","role":"assistant","model":"claude-3-7-sonnet-20250219","content":[{"type":"text","text":"```\nElegant
+        syntax\nGems sparkle in the runtime\nCode blooms like rubies\n```"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":14,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":25}}'
+  recorded_at: Fri, 28 Feb 2025 22:07:55 GMT
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","max_tokens":4000,"temperature":0.7,"messages":[{"role":"user","content":"Write
+        a one-paragraph summary of Ruby on Rails."}]}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - "<ANTHROPIC_API_KEY>"
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:10:04 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Anthropic-Ratelimit-Requests-Limit:
+      - '4000'
+      Anthropic-Ratelimit-Requests-Remaining:
+      - '3999'
+      Anthropic-Ratelimit-Requests-Reset:
+      - '2025-02-28T22:10:00Z'
+      Anthropic-Ratelimit-Input-Tokens-Limit:
+      - '200000'
+      Anthropic-Ratelimit-Input-Tokens-Remaining:
+      - '200000'
+      Anthropic-Ratelimit-Input-Tokens-Reset:
+      - '2025-02-28T22:10:00Z'
+      Anthropic-Ratelimit-Output-Tokens-Limit:
+      - '80000'
+      Anthropic-Ratelimit-Output-Tokens-Remaining:
+      - '80000'
+      Anthropic-Ratelimit-Output-Tokens-Reset:
+      - '2025-02-28T22:10:04Z'
+      Anthropic-Ratelimit-Tokens-Limit:
+      - '280000'
+      Anthropic-Ratelimit-Tokens-Remaining:
+      - '280000'
+      Anthropic-Ratelimit-Tokens-Reset:
+      - '2025-02-28T22:10:00Z'
+      Request-Id:
+      - req_01GuTPNuoQoTK7RwMnnEYWha
+      Anthropic-Organization-Id:
+      - 4f9ffac4-8fad-4b74-916f-c799c8b61a1f
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193be010c41e546-DFW
+    body:
+      encoding: ASCII-8BIT
+      string: '{"id":"msg_01Kj2w8LEe9XeGhKE9ETtx67","type":"message","role":"assistant","model":"claude-3-7-sonnet-20250219","content":[{"type":"text","text":"Ruby
+        on Rails, often simply called Rails, is a web application framework written
+        in Ruby that follows the Model-View-Controller (MVC) architectural pattern.
+        Created by David Heinemeier Hansson in 2005, Rails emphasizes \"convention
+        over configuration\" and \"don''t repeat yourself\" (DRY) principles to accelerate
+        development through sensible defaults and built-in tools. The framework provides
+        developers with time-saving features including database migrations, scaffolding
+        for quickly generating application components, and integrated testing capabilities.
+        Rails has been influential in modern web development, powering notable applications
+        like GitHub, Airbnb, and Shopify, while maintaining a vibrant community that
+        continuously contributes to its ecosystem of gems (plugins) and resources.
+        Its opinionated approach to software design and focus on developer happiness
+        has made it a popular choice for startups and established companies seeking
+        rapid application development with elegant, maintainable code."}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":18,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":196}}'
+  recorded_at: Fri, 28 Feb 2025 22:10:04 GMT
+recorded_with: VCR 6.3.1
