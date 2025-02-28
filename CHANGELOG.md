@@ -9,3 +9,7 @@
 - Conversation management
 - Rails integration
 - ActiveRecord integration capability
+
+### Changed
+- Updated minimum Ruby version requirement to 3.2.2
+- Added modern Ruby pattern matching examples

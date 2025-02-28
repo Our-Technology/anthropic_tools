@@ -1,76 +1,114 @@
 #!/usr/bin/env ruby
-require 'bundler/setup'
-require 'anthropic_tools'
-require 'dotenv/load' # Load environment variables from .env file
+# frozen_string_literal: true
 
-# Configure the client
+require "anthropic_tools"
+
+# Configure the AnthropicTools client
 AnthropicTools.configure do |config|
-  config.api_key = ENV['ANTHROPIC_API_KEY']
+  config.api_key = ENV["ANTHROPIC_API_KEY"] # Set your API key in environment variable
+  config.model = "claude-3-7-sonnet-20250219" # Use the latest Claude model
+  config.max_tokens = 4096
+  config.temperature = 0.7
 end
 
-# Example of file processing
-def file_processing_example
-  puts "Starting file processing example with Claude..."
+# Example file processing with Claude tools
+class FileProcessor
+  def initialize
+    @client = AnthropicTools::Client.new
+  end
+
+  def analyze_file(file_path)
+    file_content = File.read(file_path)
+    file_type = File.extname(file_path).delete_prefix(".")
+    
+    # Define the tools available to Claude
+    tools = [
+      {
+        name: "extract_data",
+        description: "Extract structured data from text",
+        input_schema: {
+          type: "object",
+          properties: {
+            data_format: {
+              type: "string",
+              description: "Format of the data to extract (JSON, CSV, etc.)"
+            },
+            fields: {
+              type: "array",
+              items: { type: "string" },
+              description: "List of fields to extract"
+            }
+          },
+          required: ["data_format", "fields"]
+        }
+      }
+    ]
+    
+    # Create a conversation with Claude
+    conversation = AnthropicTools::Conversation.new(
+      system: "You are a helpful assistant that specializes in analyzing files and extracting structured information.",
+      tools: tools
+    )
+    
+    # Add the file content to the conversation
+    prompt = "Please analyze the following #{file_type} file and extract relevant information:\n\n#{file_content}"
+    response = conversation.send_message(prompt)
+    
+    # Process and return the response
+    response
+  end
   
-  # Check if a file path was provided
+  # Ruby 3.1+ pattern matching example for processing different file types
+  def determine_extraction_strategy(file_path)
+    case File.extname(file_path)
+    in ".csv"
+      { strategy: :tabular, parser: :csv }
+    in ".json"
+      { strategy: :structured, parser: :json }
+    in ".txt"
+      { strategy: :text, parser: :plain }
+    in ".md"
+      { strategy: :text, parser: :markdown }
+    in ".xml" | ".html"
+      { strategy: :structured, parser: :xml }
+    else
+      { strategy: :unknown, parser: nil }
+    end
+  end
+end
+
+# Usage example
+if __FILE__ == $PROGRAM_NAME
   if ARGV.empty?
-    puts "Please provide a file path as an argument"
-    puts "Example: ruby file_processing.rb /path/to/file.txt"
+    puts "Usage: ruby file_processing.rb <file_path>"
     exit 1
   end
   
   file_path = ARGV[0]
-  
-  # Create a file processing tool
-  file_processor = AnthropicTools::Tool.new(
-    name: 'process_file',
-    description: 'Process the contents of a file',
-    parameters: {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          description: 'Action to perform on the file',
-          enum: ['summarize', 'analyze', 'extract_info']
-        }
-      },
-      required: ['action']
-    }
-  ) do |params|
-    action = params['action']
-    puts "Tool called with action: #{action}"
-    
-    begin
-      # Process the file
-      content = AnthropicTools::FileHelper.process_file(file_path)
-      
-      # Return content for Claude to work with
-      {
-        action: action,
-        file_path: file_path,
-        file_type: File.extname(file_path),
-        content: content
-      }
-    rescue => e
-      { error: "Failed to process file: #{e.message}" }
-    end
+  unless File.exist?(file_path)
+    puts "Error: File '#{file_path}' not found"
+    exit 1
   end
   
-  # Create a conversation
-  client = AnthropicTools.client
-  conversation = client.create_conversation(
-    system: "You are a helpful assistant that can analyze files. When asked to review a file, use the process_file tool."
-  )
+  processor = FileProcessor.new
   
-  # Add the file processor tool to the conversation
-  conversation.add_tools(file_processor)
+  # Using Ruby 3.1+ shorthand hash syntax
+  extraction_strategy = processor.determine_extraction_strategy(file_path)
+  puts "Using extraction strategy: #{extraction_strategy}"
   
-  # Ask Claude to analyze the file
-  puts "Asking Claude to analyze the file: #{file_path}"
-  response = conversation.send("Please analyze this file and tell me what it contains.")
+  result = processor.analyze_file(file_path)
+  puts "Analysis result:"
+  puts result.inspect
   
-  puts "Claude: #{response[:content]}"
+  # Example of continuing the conversation
+  puts "\nWould you like to ask a follow-up question about the file? (y/n)"
+  if gets.chomp.downcase == 'y'
+    puts "Enter your follow-up question:"
+    follow_up = gets.chomp
+    
+    # Assuming the conversation is stored in the result
+    follow_up_response = result.conversation.send_message(follow_up)
+    puts "Follow-up response:"
+    puts follow_up_response.inspect
+  end
 end
-
-# Run the example
-file_processing_example
