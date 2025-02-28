@@ -3,6 +3,8 @@ require 'faraday/retry'
 require 'json'
 require_relative 'stream_helper'
 require_relative 'stream_controller'
+require_relative 'middleware'
+require_relative 'instrumentation'
 
 module AnthropicTools
   class Client
@@ -36,7 +38,36 @@ module AnthropicTools
       }.compact
       
       begin
-        response = connection.post('/v1/messages/count_tokens', payload)
+        # Create request object for middleware
+        request = {
+          method: :post,
+          url: '/v1/messages/count_tokens',
+          body: payload.to_json,
+          headers: headers
+        }
+        
+        # Process request through middleware
+        request = config.middleware_stack.process_request(request)
+        
+        # Start timing
+        start_time = Time.now
+        
+        # Send request
+        response = connection.post(request[:url], JSON.parse(request[:body]))
+        
+        # Create response object for middleware
+        response_obj = {
+          status: response.status,
+          body: response.body,
+          headers: response.headers,
+          _request: request,
+          _duration: Time.now - start_time
+        }
+        
+        # Process response through middleware
+        response_obj = config.middleware_stack.process_response(response_obj)
+        
+        # Handle the response
         result = handle_response(response)
         
         # Extract the request ID from the response headers if available
@@ -45,32 +76,134 @@ module AnthropicTools
         # Add the request ID to the result
         result[:_request_id] = request_id if request_id
         
+        # Record metrics
+        record_metrics(request, response_obj, result) if config.metrics_collector
+        
         return result
       rescue Faraday::ConnectionFailed => e
         raise APIConnectionError.new("Connection failed: #{e.message}")
       rescue Faraday::TimeoutError => e
-        raise APIConnectionTimeoutError.new("Connection timed out: #{e.message}")
-      rescue Faraday::Error => e
-        raise APIConnectionError.new("Error connecting to API: #{e.message}")
+        raise APIConnectionTimeoutError.new("Request timed out: #{e.message}")
       end
     end
 
-    # Create a conversation object for easier handling of multi-turn conversations
-    def create_conversation(system: nil)
-      Conversation.new(self, system: system)
-    end
-
-    # Stream helper with improved interface
-    def stream(messages, tools: [], system: nil, max_tokens: nil, temperature: nil,
+    # Create a streaming response
+    def stream(messages, tools: [], system: nil, max_tokens: nil, temperature: nil, 
                tool_choice: nil, disable_parallel_tool_use: nil)
-      StreamHelper.new(self, messages, tools, system, max_tokens, temperature, 
-                      tool_choice, disable_parallel_tool_use)
+      helper = StreamHelper.new(
+        self, messages, tools, system, max_tokens, temperature, 
+        tool_choice, disable_parallel_tool_use
+      )
+      helper
     end
 
     private
 
     def validate_configuration
-      raise ConfigurationError, "API key is required" unless config.api_key
+      raise ConfigurationError.new("API key is required") unless config.api_key
+    end
+
+    def full_response(payload)
+      begin
+        # Create request object for middleware
+        request = {
+          method: :post,
+          url: '/v1/messages',
+          body: payload.to_json,
+          headers: headers
+        }
+        
+        # Process request through middleware
+        request = config.middleware_stack.process_request(request)
+        
+        # Start timing
+        start_time = Time.now
+        
+        # Send request
+        response = connection.post(request[:url], JSON.parse(request[:body]))
+        
+        # Create response object for middleware
+        response_obj = {
+          status: response.status,
+          body: response.body,
+          headers: response.headers,
+          _request: request,
+          _duration: Time.now - start_time
+        }
+        
+        # Process response through middleware
+        response_obj = config.middleware_stack.process_response(response_obj)
+        
+        # Handle the response
+        result = handle_response(response)
+        
+        # Record metrics
+        record_metrics(request, response_obj, result) if config.respond_to?(:metrics_collector) && config.metrics_collector
+        
+        return result
+      rescue Faraday::ConnectionFailed => e
+        raise APIConnectionError.new("Connection failed: #{e.message}")
+      rescue Faraday::TimeoutError => e
+        raise APIConnectionTimeoutError.new("Request timed out: #{e.message}")
+      end
+    end
+
+    def stream_response(payload, &block)
+      # Add stream parameter to the request
+      request = {
+        method: :post,
+        url: '/v1/messages',
+        body: payload.to_json,
+        headers: headers
+      }
+      request[:body] = JSON.parse(request[:body])
+      request[:body][:stream] = true
+      request[:body] = request[:body].to_json
+
+      # Process request through middleware
+      request = config.middleware_stack.process_request(request)
+
+      # Record request metrics
+      if config.metrics_collector
+        config.metrics_collector.record_request_start(
+          method: request[:method],
+          path: request[:url]
+        )
+      end
+
+      # Start timing the request
+      start_time = Time.now
+
+      # Make the streaming request
+      response = connection.post(request[:url]) do |req|
+        req.headers = headers
+        req.body = request[:body]
+        req.options.on_data = StreamHelper.create_on_data_handler(&block)
+      end
+
+      # Create a response hash
+      response_obj = {
+        status: response.status,
+        headers: response.headers,
+        body: response.body,
+        _request: request,
+        _duration: Time.now - start_time
+      }
+
+      # Process response through middleware
+      response_obj = config.middleware_stack.process_response(response_obj)
+
+      # Record response metrics
+      if config.metrics_collector
+        config.metrics_collector.record_request(
+          method: request[:method],
+          path: request[:url],
+          status: response.status,
+          duration: response_obj[:_duration]
+        )
+      end
+
+      response
     end
 
     def connection
@@ -135,69 +268,36 @@ module AnthropicTools
       payload
     end
 
-    def full_response(payload)
-      # Calculate dynamic timeout for large requests if not streaming
-      if !payload[:stream] && payload[:max_tokens] && payload[:max_tokens] > 4096
-        timeout = config.calculate_timeout(payload[:max_tokens])
-      else
-        timeout = config.timeout
-      end
-
-      begin
-        response = connection.post('/v1/messages', payload) do |req|
-          req.options.timeout = timeout if timeout != config.timeout
-        end
-        
-        handle_response(response)
-      rescue Faraday::ConnectionFailed => e
-        raise APIConnectionError.new("Connection failed: #{e.message}")
-      rescue Faraday::TimeoutError => e
-        raise APIConnectionTimeoutError.new("Connection timed out: #{e.message}")
-      rescue Faraday::Error => e
-        raise APIConnectionError.new("Error connecting to API: #{e.message}")
-      end
-    end
-
-    def stream_response(payload, &block)
-      payload[:stream] = true
-
-      response = connection.post('/v1/messages') do |req|
-        req.body = payload.to_json
-        req.options.on_data = Proc.new do |chunk, size, env|
-          process_stream_chunk(chunk, &block)
-        end
-      end
-
-      if response.status != 200
-        handle_response(response)
-      end
+    def parse_chunk(chunk)
+      # Skip empty chunks
+      return nil if chunk.nil? || chunk.strip.empty?
       
-      true
-    end
-
-    def process_stream_chunk(chunk, &block)
+      # Each chunk starts with "data: "
       if chunk.start_with?("data: ")
-        data = chunk.sub(/^data: /, '').strip
-        return if data == "[DONE]"
-
+        data = chunk[6..-1].strip
+        
+        # The stream ends with "data: [DONE]"
+        return nil if data == "[DONE]"
+        
         begin
-          parsed = JSON.parse(data)
-          block.call(parsed)
-        rescue JSON::ParserError => e
-          # Skip invalid JSON
+          JSON.parse(data)
+        rescue JSON::ParserError
+          nil
         end
+      else
+        nil
       end
     end
 
     def handle_response(response)
-      # Extract request ID if available
+      # Extract the request ID from the response headers if available
       request_id = response.headers['x-request-id'] || response.headers['request-id']
       
       case response.status
       when 200
         parse_response(response.body, request_id)
       when 400
-        error_message = response.body['error']['message'] rescue "Bad request"
+        error_message = "Bad request: #{response.body}"
         raise BadRequestError.new(error_message, response.status, response.body, request_id)
       when 401
         raise AuthenticationError.new("Invalid API key", response.status, response.body, request_id)
@@ -263,6 +363,27 @@ module AnthropicTools
         .select { |block| block['type'] == 'text' }
         .map { |block| block['text'] }
         .join("")
+    end
+    
+    # Record metrics for the request/response
+    def record_metrics(request, response, result, streaming: false)
+      return unless config.respond_to?(:metrics_collector) && config.metrics_collector
+      
+      # Record request metrics
+      config.metrics_collector.record_request(
+        method: request[:method],
+        path: request[:url],
+        status: response[:status],
+        duration: response[:_duration]
+      )
+      
+      # Record token usage if available
+      if result && result[:usage]
+        config.metrics_collector.record_token_usage(
+          input_tokens: result[:usage]['input_tokens'],
+          output_tokens: result[:usage]['output_tokens']
+        )
+      end
     end
   end
 end

@@ -76,4 +76,57 @@ http_interactions:
         How can I assist you today? Whether you have questions, need information,
         or just want to chat, I''m here to help. What''s on your mind?"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":8,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":38}}'
   recorded_at: Fri, 28 Feb 2025 22:20:44 GMT
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","messages":{"role":"user","content":"Hello"},"max_tokens":4096,"temperature":0.7}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - "<ANTHROPIC_API_KEY>"
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 400
+      message: Bad Request
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:49:23 GMT
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '108'
+      Connection:
+      - keep-alive
+      X-Should-Retry:
+      - 'false'
+      Request-Id:
+      - req_01X1nS58KyxHnoZ3v2eV59JY
+      Anthropic-Organization-Id:
+      - 4f9ffac4-8fad-4b74-916f-c799c8b61a1f
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193f7b42dec2cc2-DFW
+    body:
+      encoding: UTF-8
+      string: '{"type":"error","error":{"type":"invalid_request_error","message":"messages:
+        Input should be a valid list"}}'
+  recorded_at: Fri, 28 Feb 2025 22:49:23 GMT
 recorded_with: VCR 6.3.1

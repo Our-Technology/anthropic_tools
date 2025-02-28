@@ -163,5 +163,37 @@ module AnthropicTools
         @handlers[:message_stop].call(chunk['message'])
       end
     end
+    
+    def self.create_on_data_handler(&block)
+      proc do |chunk, size|
+        parsed_chunk = parse_chunk(chunk)
+        if parsed_chunk
+          block.call(parsed_chunk)
+        end
+      end
+    end
+    
+    def self.parse_chunk(chunk)
+      # Skip empty chunks
+      return nil if chunk.nil? || chunk.empty?
+      
+      # Handle data: [DONE] messages
+      return nil if chunk.include?('data: [DONE]')
+      
+      # Extract the data part
+      if chunk.start_with?('data: ')
+        data = chunk.sub(/^data: /, '').strip
+        
+        # Parse the JSON data
+        begin
+          return JSON.parse(data, symbolize_names: true)
+        rescue JSON::ParserError
+          # Skip invalid JSON
+          return nil
+        end
+      end
+      
+      nil
+    end
   end
 end

@@ -82,4 +82,62 @@ http_interactions:
         for you right away."},{"type":"tool_use","id":"toolu_01PmdJGJ5Pf6Lo4xiMuaZDHw","name":"get_weather","input":{"location":"New
         York, NY"}}],"stop_reason":"tool_use","stop_sequence":null,"usage":{"input_tokens":423,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":79}}'
   recorded_at: Fri, 28 Feb 2025 22:20:46 GMT
+- request:
+    method: post
+    uri: https://api.anthropic.com/v1/messages
+    body:
+      encoding: UTF-8
+      string: '{"model":"claude-3-7-sonnet-20250219","messages":{"role":"user","content":"What''s
+        the weather in New York?"},"tools":[{"name":"get_weather","description":"Get
+        weather information for a specific location. This tool returns the current
+        weather conditions including temperature and general conditions like sunny,
+        cloudy, or rainy.","input_schema":{"type":"object","properties":{"location":{"type":"string","description":"The
+        city and state, e.g. San Francisco, CA"}},"required":["location"]}}],"max_tokens":4096,"temperature":0.7}'
+    headers:
+      Content-Type:
+      - application/json
+      X-Api-Key:
+      - "<ANTHROPIC_API_KEY>"
+      Anthropic-Version:
+      - '2023-06-01'
+      User-Agent:
+      - Faraday v2.12.2
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 400
+      message: Bad Request
+    headers:
+      Date:
+      - Fri, 28 Feb 2025 22:49:24 GMT
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '108'
+      Connection:
+      - keep-alive
+      X-Should-Retry:
+      - 'false'
+      Request-Id:
+      - req_01UaoAxwxzdkJkBqQrrMVTMZ
+      Anthropic-Organization-Id:
+      - 4f9ffac4-8fad-4b74-916f-c799c8b61a1f
+      Via:
+      - 1.1 google
+      Cf-Cache-Status:
+      - DYNAMIC
+      X-Robots-Tag:
+      - none
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9193f7b538cb4608-DFW
+    body:
+      encoding: UTF-8
+      string: '{"type":"error","error":{"type":"invalid_request_error","message":"messages:
+        Input should be a valid list"}}'
+  recorded_at: Fri, 28 Feb 2025 22:49:24 GMT
 recorded_with: VCR 6.3.1

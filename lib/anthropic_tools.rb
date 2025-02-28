@@ -12,6 +12,8 @@ require 'anthropic_tools/errors'
 require 'anthropic_tools/file_helper'
 require 'anthropic_tools/stream_helper'
 require 'anthropic_tools/stream_controller'
+require 'anthropic_tools/middleware'
+require 'anthropic_tools/instrumentation'
 require 'anthropic_tools/railtie' if defined?(Rails)
 
 module AnthropicTools
@@ -27,12 +29,11 @@ module AnthropicTools
     end
 
     def client
-      @client ||= Client.new(configuration)
+      Client.new(configuration)
     end
-    
+
     def reset
       @configuration = Configuration.new
-      @client = nil
     end
   end
 end

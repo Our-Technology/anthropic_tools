@@ -84,13 +84,15 @@ puts "Claude: #{response[:content]}"
 
 ## Tool Use
 
-### Defining Tools
+AnthropicTools provides robust support for Claude's tool use capabilities, allowing Claude to call functions in your application.
+
+### Basic Example
 
 ```ruby
 # Define a tool
 weather_tool = AnthropicTools::Tool.new(
   name: 'get_weather',
-  description: 'Get weather information for a specific location. This tool returns the current weather conditions including temperature and general conditions like sunny, cloudy, or rainy.',
+  description: 'Get weather information for a specific location',
   input_schema: {
     type: 'object',
     properties: {
@@ -105,11 +107,7 @@ weather_tool = AnthropicTools::Tool.new(
   # Implement weather lookup here
   { temperature: 22, conditions: 'Sunny', location: params['location'] }
 end
-```
 
-### Using Tools in Conversations
-
-```ruby
 # Create a conversation with tools
 conversation = AnthropicTools::Conversation.new(AnthropicTools.client)
 conversation.add_tools(weather_tool)
@@ -119,74 +117,93 @@ response = conversation.send("What's the weather in Chicago?")
 puts response[:content]
 ```
 
-### Controlling Tool Use
+For detailed documentation on tool use, including advanced usage, controlling tool behavior, and best practices, see [docs/tool_use.md](docs/tool_use.md).
+
+## Middleware
+
+AnthropicTools includes a middleware system for processing requests and responses. This allows you to add custom functionality such as logging, metrics collection, request/response transformation, and more.
 
 ```ruby
-# Force Claude to use any tool
-response = conversation.send("Tell me about the weather somewhere nice.", 
-                           tool_choice: { type: 'any' })
-
-# Prevent parallel tool use
-response = conversation.send("Compare the weather in multiple cities.", 
-                           disable_parallel_tool_use: true)
-
-# Force Claude to use a specific tool
-response = conversation.send("I need weather information.", 
-                           tool_choice: { 
-                             type: 'tool', 
-                             name: 'get_weather' 
-                           })
+AnthropicTools.configure do |config|
+  # Add logging middleware
+  config.add_middleware(AnthropicTools::Middleware::Logging.new(
+    logger: Rails.logger,
+    level: :info
+  ))
+end
 ```
+
+For detailed documentation on middleware, including examples and best practices, see [docs/middleware.md](docs/middleware.md).
+
+## Instrumentation
+
+AnthropicTools includes instrumentation for monitoring API usage and performance metrics.
+
+```ruby
+# Enable debug mode to use the LoggerMetricsCollector
+AnthropicTools.configure do |config|
+  config.debug = true # Uses LoggerMetricsCollector with Rails.logger
+end
+
+# Or set a specific metrics collector
+AnthropicTools.configure do |config|
+  config.metrics_collector = AnthropicTools::Instrumentation::LoggerMetricsCollector.new(
+    logger: Rails.logger,
+    level: :info
+  )
+end
+```
+
+For detailed documentation on instrumentation, including custom metrics collectors and best practices, see [docs/instrumentation.md](docs/instrumentation.md).
 
 ## Streaming
 
-### Basic Streaming
+AnthropicTools provides support for streaming responses from Claude:
 
 ```ruby
-# Initialize client
 client = AnthropicTools.client
 
-# Send a message with streaming enabled
-message = AnthropicTools::Message.new(role: 'user', content: 'Write a short poem.')
+# Basic streaming with a block
+client.chat({ role: 'user', content: 'Write a short poem.' }, stream: true) do |chunk|
+  if chunk['type'] == 'content_block_delta' && chunk['delta']['type'] == 'text'
+    print chunk['delta']['text']
+    $stdout.flush
+  end
+end
 
-client.chat(message, stream: true) do |chunk|
-  case chunk['type']
-  when 'content_block_delta'
-    if chunk['delta']['type'] == 'text'
-      print chunk['delta']['text']
-      $stdout.flush  # Ensure text is displayed immediately
-    end
-  when 'content_block_start'
-    if chunk['content_block']['type'] == 'tool_use'
-      puts "\n[Tool Use Requested: #{chunk['content_block']['tool_use']['name']}]"
-    end
-  when 'message_delta'
-    puts "\n\nMessage complete." if chunk['delta']['stop_reason'] == 'end_turn'
+# Or use the improved streaming interface
+stream = client.stream([{ role: 'user', content: 'Write a poem about Ruby.' }])
+stream.on(:text) { |text| print text }
+stream.start
+```
+
+For detailed documentation on streaming, including event handling and best practices, see [docs/streaming.md](docs/streaming.md).
+
+## Testing
+
+AnthropicTools includes support for testing with VCR:
+
+```ruby
+# In your spec_helper.rb or rails_helper.rb
+require 'vcr'
+
+VCR.configure do |config|
+  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
+  config.hook_into :webmock
+  config.filter_sensitive_data('<ANTHROPIC_API_KEY>') { ENV['ANTHROPIC_API_KEY'] }
+end
+
+# In your tests
+RSpec.describe "My Feature", :vcr do
+  it "works with Claude" do
+    client = AnthropicTools.client
+    response = client.chat({ role: 'user', content: 'Hello' })
+    expect(response[:content]).to include("Hello")
   end
 end
 ```
 
-### Improved Streaming Interface
-
-```ruby
-stream = client.stream(
-  [{ role: 'user', content: 'Write a poem about Ruby.' }],
-  max_tokens: 300
-)
-
-# Register event handlers
-stream.on(:text) do |text|
-  print text
-  $stdout.flush
-end
-
-# Get the final message with all content
-message = stream.final_message
-puts "Usage: #{message[:usage].inspect}"
-
-# You can also cancel a stream
-stream.abort
-```
+For detailed documentation on testing, including VCR setup and best practices, see [docs/testing.md](docs/testing.md).
 
 ## Additional Features
 
@@ -208,46 +225,6 @@ rescue AnthropicTools::BadRequestError => e
   puts "Request ID: #{e.request_id}"
 rescue AnthropicTools::ApiError => e
   puts "API Error: #{e.message}"
-end
-```
-
-## Testing with VCR
-
-This gem includes VCR cassettes for testing, which record and replay HTTP interactions with the Anthropic API. This allows you to run tests without making actual API calls.
-
-### Setting up VCR in your tests
-
-```ruby
-require 'vcr'
-require 'webmock/rspec'
-
-VCR.configure do |config|
-  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
-  config.hook_into :webmock
-  config.configure_rspec_metadata!
-  
-  # Filter out sensitive data
-  config.filter_sensitive_data('<ANTHROPIC_API_KEY>') { ENV['ANTHROPIC_API_KEY'] }
-  
-  # Allow VCR to record new HTTP interactions when no cassette exists
-  config.default_cassette_options = {
-    record: :new_episodes,
-    match_requests_on: [:method, :uri, :body]
-  }
-end
-```
-
-### Using VCR in your specs
-
-```ruby
-RSpec.describe "Token Counting", :vcr do
-  it "counts tokens correctly", vcr: { cassette_name: 'token_counting/basic' } do
-    client = AnthropicTools.client
-    result = client.count_tokens([{ role: 'user', content: 'Hello, Claude!' }])
-    
-    expect(result).to include(:input_tokens)
-    expect(result[:input_tokens]).to be_a(Integer)
-  end
 end
 ```
 
