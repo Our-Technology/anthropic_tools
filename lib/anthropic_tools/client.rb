@@ -7,15 +7,76 @@ require_relative 'middleware'
 require_relative 'instrumentation'
 
 module AnthropicTools
+  # Main client for interacting with the Anthropic API
+  #
+  # The Client class provides methods for sending messages to Claude models,
+  # handling responses, and managing tools. It supports both synchronous and
+  # streaming requests, and includes features like automatic retries, middleware
+  # processing, and instrumentation.
+  #
+  # @example Basic usage
+  #   client = AnthropicTools::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
+  #   
+  #   response = client.chat(
+  #     messages: [
+  #       { role: 'user', content: 'Hello, Claude!' }
+  #     ]
+  #   )
+  #   
+  #   puts response[:content][0][:text]
+  #
+  # @example Using tools
+  #   client = AnthropicTools::Client.new(api_key: ENV['ANTHROPIC_API_KEY'])
+  #   
+  #   tools = [
+  #     {
+  #       name: 'get_weather',
+  #       description: 'Get the current weather for a location',
+  #       input_schema: {
+  #         type: 'object',
+  #         properties: {
+  #           location: { type: 'string', description: 'City and state, e.g. San Francisco, CA' }
+  #         },
+  #         required: ['location']
+  #       }
+  #     }
+  #   ]
+  #   
+  #   response = client.chat(
+  #     messages: [
+  #       { role: 'user', content: 'What is the weather in San Francisco?' }
+  #     ],
+  #     tools: tools,
+  #     tool_choice: 'auto'
+  #   )
+  #   
+  #   # Handle tool calls in the response
+  #   if response[:content][0][:type] == 'tool_use'
+  #     tool_call = response[:content][0]
+  #     # Process tool call and send tool output back to Claude
+  #   end
   class Client
-    attr_reader :config
-
+    # Create a new AnthropicTools client
+    #
+    # @param config [Hash] The client configuration
+    # @return [Client] A new client instance
     def initialize(config)
       @config = config
       validate_configuration
     end
 
     # Send a message to Claude
+    #
+    # @param messages [Array<Hash>] The conversation messages
+    # @param tools [Array<Hash>] Tool definitions (optional)
+    # @param system [String] System prompt (optional)
+    # @param max_tokens [Integer] Maximum tokens to generate (optional)
+    # @param temperature [Float] Temperature for generation (optional)
+    # @param stream [Boolean] Whether to stream the response (optional)
+    # @param tool_choice [String, Hash] Tool choice strategy (optional)
+    # @param disable_parallel_tool_use [Boolean] Disable parallel tool use (optional)
+    # @return [Hash] The response from Claude
+    # @raise [Error] If the request fails
     def chat(messages, tools: [], system: nil, max_tokens: nil, temperature: nil, stream: false, 
              tool_choice: nil, disable_parallel_tool_use: nil, &block)
       payload = build_payload(messages, tools, system, max_tokens, temperature, 
@@ -29,9 +90,15 @@ module AnthropicTools
     end
 
     # Count tokens for a message without sending it
+    #
+    # @param messages [Array<Hash>] The conversation messages
+    # @param tools [Array<Hash>] Tool definitions (optional)
+    # @param system [String] System prompt (optional)
+    # @return [Hash] The token count
+    # @raise [Error] If the request fails
     def count_tokens(messages, tools: [], system: nil)
       payload = {
-        model: config.model,
+        model: @config.model,
         messages: messages,
         tools: tools.empty? ? nil : tools.map(&:to_h),
         system: system
@@ -47,7 +114,7 @@ module AnthropicTools
         }
         
         # Process request through middleware
-        request = config.middleware_stack.process_request(request)
+        request = @config.middleware_stack.process_request(request)
         
         # Start timing
         start_time = Time.now
@@ -65,7 +132,7 @@ module AnthropicTools
         }
         
         # Process response through middleware
-        response_obj = config.middleware_stack.process_response(response_obj)
+        response_obj = @config.middleware_stack.process_response(response_obj)
         
         # Handle the response
         result = handle_response(response)
@@ -77,7 +144,7 @@ module AnthropicTools
         result[:_request_id] = request_id if request_id
         
         # Record metrics
-        record_metrics(request, response_obj, result) if config.metrics_collector
+        record_metrics(request, response_obj, result) if @config.metrics_collector
         
         return result
       rescue Faraday::ConnectionFailed => e
@@ -88,6 +155,15 @@ module AnthropicTools
     end
 
     # Create a streaming response
+    #
+    # @param messages [Array<Hash>] The conversation messages
+    # @param tools [Array<Hash>] Tool definitions (optional)
+    # @param system [String] System prompt (optional)
+    # @param max_tokens [Integer] Maximum tokens to generate (optional)
+    # @param temperature [Float] Temperature for generation (optional)
+    # @param tool_choice [String, Hash] Tool choice strategy (optional)
+    # @param disable_parallel_tool_use [Boolean] Disable parallel tool use (optional)
+    # @return [StreamHelper] A stream helper instance
     def stream(messages, tools: [], system: nil, max_tokens: nil, temperature: nil, 
                tool_choice: nil, disable_parallel_tool_use: nil)
       helper = StreamHelper.new(
@@ -99,10 +175,18 @@ module AnthropicTools
 
     private
 
+    # Validate the client configuration
+    #
+    # @raise [ConfigurationError] If the configuration is invalid
     def validate_configuration
-      raise ConfigurationError.new("API key is required") unless config.api_key
+      raise ConfigurationError.new("API key is required") unless @config.api_key
     end
 
+    # Send a request and get a full response
+    #
+    # @param payload [Hash] The request payload
+    # @return [Hash] The response from Claude
+    # @raise [Error] If the request fails
     def full_response(payload)
       begin
         # Create request object for middleware
@@ -114,7 +198,7 @@ module AnthropicTools
         }
         
         # Process request through middleware
-        request = config.middleware_stack.process_request(request)
+        request = @config.middleware_stack.process_request(request)
         
         # Start timing
         start_time = Time.now
@@ -132,13 +216,13 @@ module AnthropicTools
         }
         
         # Process response through middleware
-        response_obj = config.middleware_stack.process_response(response_obj)
+        response_obj = @config.middleware_stack.process_response(response_obj)
         
         # Handle the response
         result = handle_response(response)
         
         # Record metrics
-        record_metrics(request, response_obj, result) if config.respond_to?(:metrics_collector) && config.metrics_collector
+        record_metrics(request, response_obj, result) if @config.metrics_collector
         
         return result
       rescue Faraday::ConnectionFailed => e
@@ -148,6 +232,11 @@ module AnthropicTools
       end
     end
 
+    # Send a streaming request
+    #
+    # @param payload [Hash] The request payload
+    # @yield [Hash] Yields each chunk of the response
+    # @raise [Error] If the request fails
     def stream_response(payload, &block)
       # Add stream parameter to the request
       request = {
@@ -161,11 +250,11 @@ module AnthropicTools
       request[:body] = request[:body].to_json
 
       # Process request through middleware
-      request = config.middleware_stack.process_request(request)
+      request = @config.middleware_stack.process_request(request)
 
       # Record request metrics
-      if config.metrics_collector
-        config.metrics_collector.record_request_start(
+      if @config.metrics_collector
+        @config.metrics_collector.record_request_start(
           method: request[:method],
           path: request[:url]
         )
@@ -191,11 +280,11 @@ module AnthropicTools
       }
 
       # Process response through middleware
-      response_obj = config.middleware_stack.process_response(response_obj)
+      response_obj = @config.middleware_stack.process_response(response_obj)
 
       # Record response metrics
-      if config.metrics_collector
-        config.metrics_collector.record_request(
+      if @config.metrics_collector
+        @config.metrics_collector.record_request(
           method: request[:method],
           path: request[:url],
           status: response.status,
@@ -206,36 +295,21 @@ module AnthropicTools
       response
     end
 
-    def connection
-      @connection ||= Faraday.new(config.api_url) do |conn|
-        conn.options.timeout = config.timeout
-        conn.request :retry, { 
-          max: config.max_retries,
-          interval: config.retry_initial_delay,
-          max_interval: config.retry_max_delay,
-          interval_randomness: config.retry_jitter,
-          retry_statuses: config.retry_statuses,
-          methods: [:post, :get]
-        }
-        conn.headers = headers
-        conn.request :json
-        conn.response :json
-      end
-    end
-
-    def headers
-      {
-        'Content-Type' => 'application/json',
-        'x-api-key' => config.api_key,
-        'anthropic-version' => config.api_version
-      }
-    end
-
+    # Build the request payload
+    #
+    # @param messages [Array<Hash>] The conversation messages
+    # @param tools [Array<Hash>] Tool definitions (optional)
+    # @param system [String] System prompt (optional)
+    # @param max_tokens [Integer] Maximum tokens to generate (optional)
+    # @param temperature [Float] Temperature for generation (optional)
+    # @param tool_choice [String, Hash] Tool choice strategy (optional)
+    # @param disable_parallel_tool_use [Boolean] Disable parallel tool use (optional)
+    # @return [Hash] The request payload
     def build_payload(messages, tools, system, max_tokens, temperature, tool_choice, disable_parallel_tool_use)
       payload = {
-        model: config.model,
-        max_tokens: max_tokens || config.max_tokens,
-        temperature: temperature || config.temperature
+        model: @config.model,
+        max_tokens: max_tokens || @config.max_tokens,
+        temperature: temperature || @config.temperature
       }
 
       # Format messages array
@@ -268,27 +342,42 @@ module AnthropicTools
       payload
     end
 
-    def parse_chunk(chunk)
-      # Skip empty chunks
-      return nil if chunk.nil? || chunk.strip.empty?
-      
-      # Each chunk starts with "data: "
-      if chunk.start_with?("data: ")
-        data = chunk[6..-1].strip
-        
-        # The stream ends with "data: [DONE]"
-        return nil if data == "[DONE]"
-        
-        begin
-          JSON.parse(data)
-        rescue JSON::ParserError
-          nil
-        end
-      else
-        nil
+    # Get the Faraday connection
+    #
+    # @return [Faraday::Connection] The Faraday connection
+    def connection
+      @connection ||= Faraday.new(@config.api_url) do |conn|
+        conn.options.timeout = @config.timeout
+        conn.request :retry, { 
+          max: @config.max_retries,
+          interval: @config.retry_initial_delay,
+          max_interval: @config.retry_max_delay,
+          interval_randomness: @config.retry_jitter,
+          retry_statuses: @config.retry_statuses,
+          methods: [:post, :get]
+        }
+        conn.headers = headers
+        conn.request :json
+        conn.response :json
       end
     end
 
+    # Get the request headers
+    #
+    # @return [Hash] The request headers
+    def headers
+      {
+        'Content-Type' => 'application/json',
+        'x-api-key' => @config.api_key,
+        'anthropic-version' => @config.api_version
+      }
+    end
+
+    # Handle a response from Claude
+    #
+    # @param response [Faraday::Response] The response from Claude
+    # @return [Hash] The parsed response
+    # @raise [Error] If the response is an error
     def handle_response(response)
       # Extract the request ID from the response headers if available
       request_id = response.headers['x-request-id'] || response.headers['request-id']
@@ -298,28 +387,33 @@ module AnthropicTools
         parse_response(response.body, request_id)
       when 400
         error_message = "Bad request: #{response.body}"
-        raise BadRequestError.new(error_message, response.status, response.body, request_id)
+        raise BadRequestError.new(error_message, status_code: response.status, response: response.body, request_id: request_id)
       when 401
-        raise AuthenticationError.new("Invalid API key", response.status, response.body, request_id)
+        raise AuthenticationError.new("Invalid API key", status_code: response.status, response: response.body, request_id: request_id)
       when 403
-        raise PermissionDeniedError.new("Permission denied", response.status, response.body, request_id)
+        raise PermissionDeniedError.new("Permission denied", status_code: response.status, response: response.body, request_id: request_id)
       when 404
-        raise NotFoundError.new("Resource not found", response.status, response.body, request_id)
+        raise NotFoundError.new("Resource not found", status_code: response.status, response: response.body, request_id: request_id)
       when 422
-        raise UnprocessableEntityError.new("Unprocessable entity", response.status, response.body, request_id)
+        raise UnprocessableEntityError.new("Unprocessable entity", status_code: response.status, response: response.body, request_id: request_id)
       when 429
-        raise RateLimitError.new("Rate limit exceeded", response.status, response.body, request_id)
+        raise RateLimitError.new("Rate limit exceeded", status_code: response.status, response: response.body, request_id: request_id)
       when 500
-        raise InternalServerError.new("Internal server error", response.status, response.body, request_id)
+        raise InternalServerError.new("Internal server error", status_code: response.status, response: response.body, request_id: request_id)
       when 503
-        raise ServiceUnavailableError.new("Service unavailable", response.status, response.body, request_id)
+        raise ServiceUnavailableError.new("Service unavailable", status_code: response.status, response: response.body, request_id: request_id)
       when 500..599
-        raise ServerError.new("Server error", response.status, response.body, request_id)
+        raise ServerError.new("Server error", status_code: response.status, response: response.body, request_id: request_id)
       else
-        raise ApiError.new("Unexpected error: #{response.body}", response.status, response.body, request_id)
+        raise ApiError.new("Unexpected error: #{response.body}", status_code: response.status, response: response.body, request_id: request_id)
       end
     end
 
+    # Parse a response from Claude
+    #
+    # @param body [String] The response body
+    # @param request_id [String] The request ID
+    # @return [Hash] The parsed response
     def parse_response(body, request_id = nil)
       # Parse the JSON body if it's a string
       parsed_body = body.is_a?(String) ? JSON.parse(body) : body
@@ -356,6 +450,10 @@ module AnthropicTools
       response
     end
 
+    # Extract content from a message
+    #
+    # @param content_blocks [Array<Hash>] The content blocks
+    # @return [String] The extracted content
     def extract_content(content_blocks)
       return "" unless content_blocks
 
@@ -366,11 +464,16 @@ module AnthropicTools
     end
     
     # Record metrics for the request/response
+    #
+    # @param request [Hash] The request
+    # @param response [Hash] The response
+    # @param result [Hash] The result
+    # @param streaming [Boolean] Whether the request was streaming
     def record_metrics(request, response, result, streaming: false)
-      return unless config.respond_to?(:metrics_collector) && config.metrics_collector
+      return unless @config.respond_to?(:metrics_collector) && @config.metrics_collector
       
       # Record request metrics
-      config.metrics_collector.record_request(
+      @config.metrics_collector.record_request(
         method: request[:method],
         path: request[:url],
         status: response[:status],
@@ -379,7 +482,7 @@ module AnthropicTools
       
       # Record token usage if available
       if result && result[:usage]
-        config.metrics_collector.record_token_usage(
+        @config.metrics_collector.record_token_usage(
           input_tokens: result[:usage]['input_tokens'],
           output_tokens: result[:usage]['output_tokens']
         )

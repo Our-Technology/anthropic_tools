@@ -1,38 +1,44 @@
 module AnthropicTools
+  # Middleware system for processing requests and responses
+  #
   # The Middleware module provides a way to intercept and modify requests and responses
-  # in the AnthropicTools client. Middleware can be used for logging, metrics collection,
-  # request/response transformation, and other cross-cutting concerns.
+  # in the AnthropicTools client. This allows for adding custom functionality such as
+  # logging, metrics collection, request/response transformation, and more.
   #
-  # Each middleware must implement three methods:
-  # - `initialize`: Takes any configuration options
-  # - `before_request`: Called before a request is sent, can modify the request
-  # - `after_response`: Called after a response is received, can modify the response
+  # @example Adding middleware to the client
+  #   AnthropicTools.configure do |config|
+  #     # Add logging middleware
+  #     config.add_middleware(AnthropicTools::Middleware::Logging.new(
+  #       logger: Rails.logger,
+  #       level: :info
+  #     ))
+  #   end
   #
-  # @example Creating a simple logging middleware
-  #   class LoggingMiddleware
-  #     def initialize(logger: Logger.new(STDOUT))
-  #       @logger = logger
-  #     end
-  #
+  # @example Creating custom middleware
+  #   class MyMiddleware < AnthropicTools::Middleware::Base
   #     def before_request(request)
-  #       @logger.info("Sending request to #{request[:url]}")
-  #       request # Return the request (possibly modified)
+  #       # Modify the request
+  #       request[:headers]['X-Custom-Header'] = 'value'
+  #       request
   #     end
   #
   #     def after_response(response)
-  #       @logger.info("Received response with status #{response[:status]}")
-  #       response # Return the response (possibly modified)
+  #       # Modify the response
+  #       response[:custom_data] = 'value'
+  #       response
   #     end
   #   end
   #
   #   AnthropicTools.configure do |config|
-  #     config.add_middleware(LoggingMiddleware.new)
+  #     config.add_middleware(MyMiddleware.new)
   #   end
   module Middleware
+    # This module serves as a namespace for middleware components.
+    # The actual middleware classes are defined in the middleware/ directory.
   end
 end
 
-# Require all middleware files
+# Require all middleware components
 require_relative 'middleware/base'
 require_relative 'middleware/stack'
 require_relative 'middleware/logging'

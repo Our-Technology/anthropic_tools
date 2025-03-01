@@ -1,34 +1,78 @@
 require 'logger'
 
 module AnthropicTools
-  # The Instrumentation module provides tools for monitoring and debugging
-  # AnthropicTools client operations. It includes telemetry points for tracking
-  # API usage, performance metrics, and debugging information.
+  # Instrumentation for monitoring API usage and performance
   #
-  # @example Enabling debug mode
+  # The Instrumentation module provides classes for collecting metrics about
+  # API requests, responses, and token usage. These metrics can be used for
+  # monitoring, debugging, and optimization.
+  #
+  # @example Using the logger metrics collector
   #   AnthropicTools.configure do |config|
-  #     config.debug = true
+  #     config.metrics_collector = AnthropicTools::Instrumentation::LoggerMetricsCollector.new(
+  #       logger: Rails.logger
+  #     )
   #   end
   #
-  # @example Using a custom logger
-  #   AnthropicTools.configure do |config|
-  #     config.logger = Rails.logger
+  # @example Creating a custom metrics collector
+  #   class CustomMetricsCollector < AnthropicTools::Instrumentation::MetricsCollector
+  #     def record_request(method:, path:, status:, duration:)
+  #       # Send metrics to your monitoring system
+  #       StatsD.timing("anthropic.request.duration", duration * 1000)
+  #       StatsD.increment("anthropic.request.count", tags: ["status:#{status}"])
+  #     end
+  #
+  #     def record_token_usage(input_tokens:, output_tokens:)
+  #       # Record token usage
+  #       StatsD.gauge("anthropic.tokens.input", input_tokens)
+  #       StatsD.gauge("anthropic.tokens.output", output_tokens)
+  #     end
   #   end
   #
-  # @example Adding a custom metrics collector
   #   AnthropicTools.configure do |config|
-  #     config.metrics_collector = MyMetricsCollector.new
+  #     config.metrics_collector = CustomMetricsCollector.new
   #   end
   module Instrumentation
     # Base class for metrics collectors
+    #
+    # The MetricsCollector class defines the interface for collecting metrics
+    # about API requests, responses, and token usage. Subclasses should implement
+    # the {#record_request} and {#record_token_usage} methods.
+    #
+    # @abstract Subclass and override {#record_request} and {#record_token_usage} to implement
     class MetricsCollector
-      # Record a request
-      # @param method [Symbol] The HTTP method
-      # @param path [String] The request path
-      # @param status [Integer] The response status code
+      # Record metrics for an API request
+      #
+      # @param method [Symbol] The HTTP method (:get, :post, etc.)
+      # @param path [String] The API endpoint path
+      # @param status [Integer] The HTTP status code
       # @param duration [Float] The request duration in seconds
+      # @return [void]
+      # @abstract
       def record_request(method:, path:, status:, duration:)
-        # Override in subclasses
+        # Implement in subclasses
+      end
+
+      # Record metrics for token usage
+      #
+      # @param input_tokens [Integer] The number of input tokens
+      # @param output_tokens [Integer] The number of output tokens
+      # @return [void]
+      # @abstract
+      def record_token_usage(input_tokens:, output_tokens:)
+        # Implement in subclasses
+      end
+
+      # Record the start of a request
+      #
+      # This method is optional and may be implemented by subclasses
+      # to record metrics at the start of a request.
+      #
+      # @param method [Symbol] The HTTP method (:get, :post, etc.)
+      # @param path [String] The API endpoint path
+      # @return [void]
+      def record_request_start(method:, path:)
+        # Optional method, implement in subclasses if needed
       end
 
       # Record token usage
@@ -47,16 +91,36 @@ module AnthropicTools
     end
 
     # Null metrics collector that does nothing
+    #
+    # The NullMetricsCollector is a no-op implementation of the MetricsCollector
+    # interface. It can be used when metrics collection is not needed.
+    #
+    # @example
+    #   AnthropicTools.configure do |config|
+    #     config.metrics_collector = AnthropicTools::Instrumentation::NullMetricsCollector.new
+    #   end
     class NullMetricsCollector < MetricsCollector
+      # Record metrics for an API request (no-op)
+      #
+      # @param method [Symbol] The HTTP method (:get, :post, etc.)
+      # @param path [String] The API endpoint path
+      # @param status [Integer] The HTTP status code
+      # @param duration [Float] The request duration in seconds
+      # @return [void]
       def record_request(method:, path:, status:, duration:)
-        # Do nothing
+        # No-op
+      end
+
+      # Record metrics for token usage (no-op)
+      #
+      # @param input_tokens [Integer] The number of input tokens
+      # @param output_tokens [Integer] The number of output tokens
+      # @return [void]
+      def record_token_usage(input_tokens:, output_tokens:)
+        # No-op
       end
 
       def record_request_start(method:, path:)
-        # Do nothing
-      end
-
-      def record_token_usage(input_tokens:, output_tokens:)
         # Do nothing
       end
 
@@ -65,30 +129,62 @@ module AnthropicTools
       end
     end
 
-    # Logger-based metrics collector that logs metrics
+    # Logger-based metrics collector
+    #
+    # The LoggerMetricsCollector logs metrics about API requests, responses,
+    # and token usage using a logger. It can be used for debugging and monitoring.
+    #
+    # @example
+    #   AnthropicTools.configure do |config|
+    #     config.metrics_collector = AnthropicTools::Instrumentation::LoggerMetricsCollector.new(
+    #       logger: Rails.logger,
+    #       level: :info
+    #     )
+    #   end
     class LoggerMetricsCollector < MetricsCollector
-      # Initialize the logger metrics collector
-      # @param logger [Logger] The logger to use
-      # @param level [Symbol] The log level to use
-      def initialize(logger: Logger.new(STDOUT), level: :info)
-        @logger = logger
-        @level = level
+      # Create a new logger metrics collector
+      #
+      # @param logger [Logger] The logger to use (defaults to a new Logger instance)
+      # @param level [Symbol, String] The log level to use (:debug, :info, :warn, :error, :fatal)
+      # @return [LoggerMetricsCollector] A new logger metrics collector instance
+      def initialize(logger: nil, level: :info)
+        @logger = logger || Logger.new(STDOUT)
+        @level = level.to_sym
       end
 
-      # Record a request
-      # @param method [Symbol] The HTTP method
-      # @param path [String] The request path
-      # @param status [Integer] The response status code
+      # Record metrics for an API request
+      #
+      # Logs information about the request, including method, path, status, and duration.
+      #
+      # @param method [Symbol] The HTTP method (:get, :post, etc.)
+      # @param path [String] The API endpoint path
+      # @param status [Integer] The HTTP status code
       # @param duration [Float] The request duration in seconds
+      # @return [void]
       def record_request(method:, path:, status:, duration:)
-        @logger.send(@level, "AnthropicTools Request: #{method.upcase} #{path} - Status: #{status} - Duration: #{duration.round(2)}s")
+        @logger.send(@level, "AnthropicTools Request: #{method.to_s.upcase} #{path} - Status: #{status} - Duration: #{duration}s")
       end
 
-      # Record token usage
+      # Record metrics for token usage
+      #
+      # Logs information about token usage, including input and output tokens.
+      #
       # @param input_tokens [Integer] The number of input tokens
       # @param output_tokens [Integer] The number of output tokens
+      # @return [void]
       def record_token_usage(input_tokens:, output_tokens:)
         @logger.send(@level, "AnthropicTools Token Usage: Input: #{input_tokens} - Output: #{output_tokens} - Total: #{input_tokens + output_tokens}")
+      end
+
+      # Record the start of a request
+      #
+      # Logs information about the start of a request, including method and path.
+      #
+      # @param method [Symbol] The HTTP method (:get, :post, etc.)
+      # @param path [String] The API endpoint path
+      # @return [void]
+      def record_request_start(method:, path:)
+        @logger.send(@level, "AnthropicTools Request Started: #{method.to_s.upcase} #{path}")
       end
 
       # Record a tool usage

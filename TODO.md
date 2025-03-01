@@ -3,7 +3,6 @@
 ## Medium Priority
 
 ### Add Documentation
-- Create comprehensive YARD documentation for all classes
 - Add detailed tutorials in the README
 - Add examples for all new features
 
@@ -31,14 +30,28 @@
 - Add raw response access for accessing headers and other metadata
 - Add auto-pagination support for list endpoints
 - Add configurable HTTP agent/client for proxies and custom networking
-- Implement dynamic timeout calculation based on max_tokens
 
 ## Completed 
 
+### Documentation Improvements
+- ✅ Added comprehensive YARD documentation to the Railtie class
+- ✅ Enhanced documentation for the StreamController class
+- ✅ Added detailed parameter and return value documentation for API error classes
+- ✅ Created comprehensive YARD documentation for classes
+
+### Remove Redundant Classes
+- ✅ Removed redundant FunctionCall and FunctionResponse classes
+- ✅ Consolidated functionality into ToolUse and ToolResult classes
+- ✅ Updated all tests to work with the new class structure
+- ✅ Fixed client.rb to properly use instance variables for configuration
+- ✅ Enhanced error handling to include request_id in all API errors
+
 ### Add Middleware Support
-- Create a middleware system for request/response processing
-- Allow users to easily add logging, metrics, or transformations
-- Support custom HTTP client configuration (similar to TypeScript's fetch option)
+- ✅ Implemented middleware stack for request/response processing
+- ✅ Added logging middleware for debugging
+- ✅ Added metrics collection middleware
+- ✅ Fixed middleware tests to ensure proper implementation of required methods
+- ✅ Support custom HTTP client configuration
 
 ### Add Instrumentation
 - Add telemetry points for monitoring tool usage and performance
@@ -76,3 +89,13 @@
 ### Add Streaming Support
 - Enhance the streaming capabilities with better error handling
 - Add examples demonstrating streaming responses
+
+### Improve Documentation Structure
+- Create dedicated documentation files for key features:
+  - Created `docs/tool_use.md` for comprehensive tool use documentation
+  - Created `docs/instrumentation.md` for detailed metrics collection guide
+  - Created `docs/streaming.md` for in-depth streaming documentation
+  - Created `docs/testing.md` for testing with VCR documentation
+  - Maintained `docs/middleware.md` for middleware documentation
+- Update README.md with concise information and links to detailed docs
+- Add detailed examples for each feature in documentation files

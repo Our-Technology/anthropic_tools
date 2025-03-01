@@ -9,7 +9,7 @@ RSpec.describe AnthropicTools::Middleware do
     end
     
     it "processes requests through middleware" do
-      middleware = double("Middleware")
+      middleware = double("Middleware", before_request: nil, after_response: nil)
       expect(middleware).to receive(:before_request).with({ url: '/test' }).and_return({ url: '/modified' })
       
       stack.add(middleware)
@@ -19,8 +19,8 @@ RSpec.describe AnthropicTools::Middleware do
     end
     
     it "processes responses through middleware in reverse order" do
-      middleware1 = double("Middleware1")
-      middleware2 = double("Middleware2")
+      middleware1 = double("Middleware1", before_request: nil, after_response: nil)
+      middleware2 = double("Middleware2", before_request: nil, after_response: nil)
       
       # Set up the expectations in reverse order since we're testing the reverse processing
       expect(middleware2).to receive(:after_response).with({ status: 200 }).and_return({ status: 201 })
